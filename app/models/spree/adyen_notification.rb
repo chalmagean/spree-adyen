@@ -27,7 +27,10 @@ module Spree
         case event_code
         when 'AUTHORISATION'
           payment.started_processing!
-          call_capture
+          # removed call_capture
+          # this should be done by the admin over the spree admin page
+          # via the "capture" button
+          #call_capture
           update_attribute(:processed, true)
         when 'CAPTURE'
           payment.complete!
@@ -75,6 +78,13 @@ module Spree
         converted_params[column_name] = value if self.column_names.include?(column_name)
       end
 
+      # don't try to create duplicate entries. 
+      # this will trigger a mysql error resulting in an exception 
+      # and adyen will stop notifications if it doesn't receive a [accepted]
+      # also it will retry to send the same notification until it finally receives
+      # a [accepted] text. 
+      converted_params['success']=="true" ? v_success=true : v_success=false
+      return false if !self.where(:psp_reference=>converted_params['psp_reference'][0..29]).where(:event_code=>converted_params['event_code']).where(:success=>v_success).blank?
       self.create!(converted_params)
     end
 
